@@ -1,0 +1,68 @@
+---
+title: "Simple spatial interaction model in R"
+author: "Robin Lovelace"
+date: "23/07/2014"
+output: html_document
+---
+
+This document shows the construction of a very basic spatial interaction model in R. It builds on a previous [unconstrained model](https://github.com/Robinlovelace/twitter-leeds) with a new set of data. Before loading the data, we set-up R environment:
+
+```{r, message=FALSE}
+# Load packages and setup global parameters
+x <- c("gdata", "rgeos", "sp") # packages we'll be using
+lapply(x, require, character.only = T)
+set.seed(0) # make probabilistic results reproducible
+beta <- 0.3
+```
+
+## Loading the input data
+
+The data are stored in in the stores.csv file - the `CENTRE_SIZE` variable has been
+modified to avoid the disclosure of commercially sensitive information:
+
+```{r}
+d <- read.csv("data/stores.csv") # the 80 locations used
+coords <- matrix(c(d$EAST, d$NORTH), ncol = 2) # coordinates of dests
+d <- SpatialPointsDataFrame(coords, data = d) # convert to spatial data
+d$pop <- rnorm(n = nrow(d), mean = 1000, sd = 200) # random population variable
+```
+
+## Generating the distance matrix
+Because R sees the `d` object as a spatial point, we can produce a distance matrix between different points with a single line of code. The second line below creates
+a new matrix of the same dimension, set to 0, for recording the flow:
+
+```{r}
+r <- gDistance(d, d, byid = T) / 1000
+f <- r; f[] <- 0
+```
+
+## Run and plot the basic model
+
+The only remaining task is to run the model, in a nested for loop over origins (i) and destinations (j). Note the omission of flows between origins and destinations that are the same with `n[-i]`:
+
+```{r}
+plot(d)
+n <- 1:nrow(d)
+for(i in n){
+  for(j in n[-i]){
+    f[i,j] <- d$pop[i] * d$CENTRE_SIZE[j] * exp(-beta * r[i,j])
+    fw <- f[i,j]^0.3 / 10
+    lines(c(d$EAST[i], d$EAST[j]), c(d$NORTH[i], d$NORTH[j]), lwd = fw)
+  }  
+}
+```
+
+## Further work
+
+There are many ways we can refine and extend the above model.
+In future posts we'll see how to add more parameters and allow
+the population of each origin to determine the outward flow.
+We'll also take a look at how to optimise the using the `optim()`
+function.
+
+Eventually, the aim is to build a fully operations [radiation model]()
+and compare this with the classic gravity model presented in this post.
+The oportunities for further work in this area are vast, so
+watch this space for further work.
+
+
